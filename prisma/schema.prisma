@@ -1,0 +1,134 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IssueType {
+  REVENUE_CONTRIBUTION_DIVERGENCE
+  DISCOUNT_LEAK
+  PRODUCT_MIX_LEAK
+  HIGH_MARGIN_OPPORTUNITY
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum ExperimentMetric {
+  CONTRIBUTION
+  CONTRIBUTION_MARGIN
+  REVENUE
+  ORDERS
+}
+
+enum SubscriptionPlan {
+  FREE
+  STANDARD
+  PREMIUM
+}
+
+model Merchant {
+  id           Int              @id @default(autoincrement())
+  name         String
+  businessType String
+  area         String           @default("Connaught Place, New Delhi")
+  latitude     Float            @default(28.6315)
+  longitude    Float            @default(77.2167)
+  plan         SubscriptionPlan @default(FREE)
+  createdAt    DateTime         @default(now())
+
+  products    Product[]
+  orders      Order[]
+  insights    Insight[]
+  experiments Experiment[]
+
+  @@index([businessType])
+  @@index([area])
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  merchantId   Int
+  name         String
+  category     String
+  sellingPrice Float
+  costPrice    Float
+  createdAt    DateTime @default(now())
+
+  merchant    Merchant     @relation(fields: [merchantId], references: [id])
+  orders      Order[]
+  experiments Experiment[]
+
+  @@index([merchantId])
+}
+
+model Order {
+  id           Int      @id @default(autoincrement())
+  merchantId   Int
+  productId    Int
+  quantity     Int
+  sellingPrice Float
+  discount     Float
+  createdAt    DateTime @default(now())
+
+  merchant Merchant @relation(fields: [merchantId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([merchantId, createdAt])
+  @@index([productId])
+}
+
+model Insight {
+  id          Int       @id @default(autoincrement())
+  merchantId  Int
+  issueType   IssueType
+  severity    Severity
+  title       String
+  description String
+  signals     Json
+  aiOutput    Json
+  createdAt   DateTime  @default(now())
+
+  merchant    Merchant     @relation(fields: [merchantId], references: [id])
+  experiments Experiment[]
+
+  @@index([merchantId])
+}
+
+model Experiment {
+  id           Int              @id @default(autoincrement())
+  merchantId   Int
+  productId    Int
+  insightId    Int
+  type         String
+  oldValue     Float
+  newValue     Float
+  durationDays Int
+  metric       ExperimentMetric
+  status       ExperimentStatus @default(DRAFT)
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  merchant Merchant @relation(fields: [merchantId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+  insight  Insight  @relation(fields: [insightId], references: [id])
+
+  @@index([merchantId, status])
+  @@index([productId])
+  @@index([insightId])
+}
